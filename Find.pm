@@ -1,6 +1,6 @@
 package Chemistry::Bond::Find;
 
-$VERSION = '0.05';
+$VERSION = '0.10';
 # $Id$
 
 =head1 NAME
@@ -61,10 +61,11 @@ my $Default_Radius = 1.5; # radius for unknown elements
 # $opts->{cuttof} Hash Table of cutoffs. 
 # Example: key = "H C", value = [0.76, 1.42]
 sub are_bonded {
-    my ($a, $b, $r, $opts) = @_;
-    return $r < ($opts->{cuttoffs}{"$a $b"} ||= 
-        (($Covalent_Radius{$a} || $Default_Radius) 
-         + ($Covalent_Radius{$b} || $Default_Radius)) * $opts->{tolerance});
+    my ($symbol_a, $symbol_b, $r, $opts) = @_;
+    return $r < ($opts->{cuttoffs}{"$symbol_a $symbol_b"} ||= 
+        (($Covalent_Radius{$symbol_a} || $Default_Radius) 
+            + ($Covalent_Radius{$symbol_b} || $Default_Radius)) 
+        * $opts->{tolerance});
 }
 
 
@@ -78,7 +79,7 @@ my %Groups = (
     I => 7, Si => 4, P => 5, S => 6, 
 );
 
-my %Valencies = (
+my %Valences = (
     H => 1, B => 3, C => 4, N => 3, O => 2, F => 1, Cl => 1, => Br => 1, 
     I => 1, Si => 4, P => 3, S => 2, 
 );
@@ -92,7 +93,7 @@ sub assign_orders {
     #assign_ambiguous($mol);
     for my $atom ($mol->atoms) {
         my $charge = 0;
-        my $free = $Valencies{$atom->symbol} - $atom->bonds;
+        my $free = $Valences{$atom->symbol} - $atom->bonds;
         $free = 0 if $free < 0;
         $atom->attr("bond-find/free", $free);
     }
@@ -100,10 +101,9 @@ sub assign_orders {
 }
 
 
-
 =item find_bonds($mol, %options)
 
-Find and add the bonds in a molecule. Only use it in molecules that have no 
+Finds and adds the bonds in a molecule. Only use it in molecules that have no 
 explicit bonds; for example, after reading a file with 3D coordinates but no
 bond orders.
 
@@ -119,29 +119,26 @@ them is less than the sum of their covalent radii multiplied by the tolerance.
 =item margin
 
 NOTE: in general setting this option is not recommended, unless you know what
-you are doing. Used by the recursive partitioning algorithm when "stitching"
-the interfaces between partitions. It defaults to 2 * Rmax * tolerance, where
-Rmax is the largest covalent radius among the elements found in the molecule.
-For example, if a molecule has C, H, N, O, and I, Rmax = R(I) = 1.33, so the
-margin defaults to 2 * 1.33 * 1.1 = 2.926. This margin ensures that no bonds
-are missed by the partitioning algorithm. Using a smaller value gives faster
-results, but at the risk of missing some bonds. In this exaple, if you are
-certain that your molecule doesn't contain I-I bonds (but it has C-I bonds),
-you can set margin to (0.77 + 1.33) * 1.1 = 2.31 and you still won't miss any
-bonds. All this only has a real impact for molecules with a thousand atoms or
-more.
+you are doing. It is used by the space partitioning algorithm to determine the
+"bucket size". It defaults to 2 * Rmax * tolerance, where Rmax is the largest
+covalent radius among the elements found in the molecule. For example, if a
+molecule has C, H, N, O, and I, Rmax = R(I) = 1.33, so the margin defaults to 2
+* 1.33 * 1.1 = 2.926. This margin ensures that no bonds are missed by the
+partitioning algorithm. 
 
-=item min_atoms
-
-Defaults to 20. Partitions with fewer that min_atoms will not be partitioned
-further, but their bonds will be found by a simple n^2 method. The default
-value seems to be optimal, but you can play with it if you want.
+Using a smaller value gives faster results, but at the risk of missing some
+bonds. In this example, if you are certain that your molecule doesn't contain
+I-I bonds (but it has C-I bonds), you can set margin to (0.77 + 1.33) * 1.1 =
+2.31 and you still won't miss any bonds (0.77 is the radius of carbon).  This
+only has a significant impact for molecules with a thousand atoms or more, but
+you can reduce execution time by 50% in some cases.
 
 =back
 
 =cut
 
-sub find_bonds {
+# The recursive algorithm used in version 0.05, here for historical purposes
+sub find_bonds_rec {
     my ($mol, %opts) = @_;
     %opts = (min_atoms => 20, tolerance => 1.1, %opts,
         cutoffs => {});  # set defaults
@@ -222,13 +219,61 @@ sub find_bonds_n2_two_sets {
     }
 }
 
+sub find_bonds {
+    my ($mol, %opts) = @_;
+    %opts = (min_atoms => 20, tolerance => 1.1, %opts,
+        cutoffs => {});  # set defaults
+    my $margin = guess_margin($mol, \%opts);    
+    %opts = (margin => $margin, %opts);
+    my $grid = {};
+    partition_space($mol, $grid, \%opts);
+    find_bonds_grid($mol, $grid, \%opts);
+}
+
+use POSIX 'floor';
+my $Y = 1000;
+my $X = $Y * $Y;
+my $Z = 1;
+my $ORIGIN = int(($Y**3 + $Y**2 + $Y)/2);
+
+sub partition_space {
+    my ($mol, $grid, $opts) = @_;
+    my $margin = $opts->{margin};
+    for my $atom ($mol->atoms) {
+        my (@vec) = $atom->coords->array;
+        my (@norm_vec) = map { floor($_ / $margin) } @vec;
+        my $n = $X * $norm_vec[0] + $Y * $norm_vec[1]
+            + $norm_vec[2] + $ORIGIN;
+        push @{$grid->{$n}}, $atom;
+    }
+}
+
+sub find_bonds_grid {
+    my ($mol, $grid, $opts) = @_;
+    while (my ($n, $atoms) = each %$grid) {
+        #print "Cell $n has ". @$atoms . " atoms\n";
+        find_bonds_n2_one_set($mol, $atoms, $opts);
+        for my $neigh_n (
+            $n+$Z, 
+            $n+$Z+$Y, $n+$Z-$Y, $n+$Z+$X, $n+$Z-$X, 
+            $n+$Z+$Y+$X, $n+$Z+$Y-$X, $n+$Z-$Y+$X, $n+$Z-$Y-$X,
+            $n+$Y, $n+$Y+$X, $n+$Y-$X,
+            $n+$X,
+            ) {
+            if ($grid->{$neigh_n}) {
+                find_bonds_n2_two_sets($mol, $atoms, $grid->{$neigh_n}, $opts);
+            }
+        }
+    }
+}
+
 1;
 
 =back
 
 =head1 VERSION
 
-0.05
+0.10
 
 =head1 SEE ALSO
 
