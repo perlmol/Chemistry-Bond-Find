@@ -1,6 +1,6 @@
 package Chemistry::Bond::Find;
 
-$VERSION = '0.20';
+$VERSION = '0.21';
 our $DEBUG = 0;
 # $Id$
 
@@ -293,6 +293,12 @@ starting atom and their neighbors. This permits separating the molecule into
 independent regions, so that if one is solved and there's a problem in another,
 we don't have to backtrack to the first one.
 
+The itub algorithm has the following additional options:
+
+=over
+
+=item use_coords
+
 Although the algorithm does not I<require> 3D coordinates, it uses them by
 default to improve the initial guesses of which bond orders should be
 increased. To avoid using coordinates, add the C<use_coords> option with a
@@ -302,6 +308,14 @@ false value:
 
 The results are the same most of the time, but using good coordinates improves
 the results for complicated cases such as fused heteroaromatic systems.
+
+=item scratch
+
+If true, start the bond order assignment from scratch by assuming that all bond
+orders are 1. If false, start from the current bond orders and try to fix the
+unsatisfied valences. This option is true by default.
+
+=back
 
 =item baber
 
@@ -356,10 +370,12 @@ my %ALLOWED_INCREASES = (
 
 sub assign_bond_orders_itub {
     my ($mol, %opts) = @_;
-    %opts = (use_coords => 1, funny => {}, %opts);
+    %opts = (use_coords => 1, scratch => 1, funny => {}, %opts);
     #my @funny_atoms;
 
-    $_->order(1) for $mol->bonds;
+    if ($opts{scratch}) {
+        $_->order(1) for $mol->bonds;
+    }
     for my $atom ($mol->atoms) {
         if (wants_more_bonds($atom)) {
             my $ret = make_happy($atom, \%opts, []);
@@ -374,10 +390,10 @@ sub assign_bond_orders_itub {
 
 sub wants_more_bonds {
     my ($atom) = @_;
-    my $n_bonds = 0;
-    $n_bonds += $_->order for $atom->bonds;
+    my $valence = $atom->valence;
+    #$n_bonds += $_->order for $atom->bonds;
 
-    my $ret = ($n_bonds < ($MIN_VALENCES{$atom->symbol} || 1));
+    my $ret = ($valence < ($MIN_VALENCES{$atom->symbol} || 1));
     print "    $atom wants more bonds? '$ret'\n" if $DEBUG;
     $ret;
 }
@@ -453,13 +469,14 @@ sub accepts_more_bonds {
     my ($atom, $to) = @_;
     my ($symbol, $to_symbol) = ($atom->symbol, $to->symbol);
 
-    my $n_bonds = 0;
-    $n_bonds += $_->order for $atom->bonds;
+    #my $n_bonds = 0;
+    #$n_bonds += $_->order for $atom->bonds;
+    my $valence = $atom->valence;
 
     # not enough bonds even for the minimum valence?
-    return 1 if ($n_bonds < ($MIN_VALENCES{$atom->symbol} || 1));
+    return 1 if ($valence < ($MIN_VALENCES{$atom->symbol} || 1));
 
-    if ($n_bonds < ($ALLOWED_INCREASES{$symbol}{$to_symbol} || 0)) {
+    if ($valence < ($ALLOWED_INCREASES{$symbol}{$to_symbol} || 0)) {
         # make sure we are willing to make multiple bonds with this guy
         return 1;
     } else {
@@ -728,7 +745,7 @@ sub next_valence {
 
 =head1 VERSION
 
-0.20
+0.21
 
 =head1 TO DO
 

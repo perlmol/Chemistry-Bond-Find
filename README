@@ -1,14 +1,14 @@
-Chemistry/Bond/Find version 0.20
+Chemistry/Bond/Find version 0.21
 ================================
 
-Detects the bonds in a molecule from its 3D coordinates by using simple
-cutoffs.  The current version does not guess the bond orders; all bonds will
-have a bond order of 1.
+This module provides functions for detecting the bonds in a molecule from its
+3D coordinates by using simple cutoffs, and for guessing the formal bond
+orders.
 
 This module is part of the PerlMol project, L<http://www.perlmol.org/>.
 
-Changes since 0.10
-    - Added assign_orders
+Changes since 0.20
+        - New options for assign_bond_orders: scratch.
 
 INSTALLATION
 
@@ -22,7 +22,7 @@ To install this module type the following:
 DEPENDENCIES
 
 This module requires these other modules and libraries:
-    - Chemistry::Mol
+        'Chemistry::Mol' => '0.24',
 
 COPYRIGHT AND LICENSE
 
