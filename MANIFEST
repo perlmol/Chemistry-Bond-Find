@@ -1,0 +1,6 @@
+Find.pm
+MANIFEST			This list of files
+Makefile.PL
+README
+t/1.t
+t/pod.t
