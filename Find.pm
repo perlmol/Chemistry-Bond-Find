@@ -85,8 +85,36 @@ sub find_bonds {
     }
 }
 
+# Future work:
 # assign hybridization
 # assign bond order
+# let's think about how to deal with aromaticity...
+
+my %Groups = (
+    H => 1, B => 3, C => 4, N => 5, O => 6, F => 7, Cl => 7, => Br => 7, 
+    I => 7, Si => 4, P => 5, S => 6, 
+);
+
+my %Valencies = (
+    H => 1, B => 3, C => 4, N => 3, O => 2, F => 1, Cl => 1, => Br => 1, 
+    I => 1, Si => 4, P => 3, S => 2, 
+);
+
+
+# under construction...
+sub assign_orders {
+    my ($mol, %opts) = @_;
+
+    #assign_unambiguous($mol);
+    #assign_ambiguous($mol);
+    for my $atom ($mol->atoms) {
+        my $charge = 0;
+        my $free = $Valencies{$atom->symbol} - $atom->bonds;
+        $free = 0 if $free < 0;
+        $atom->attr("bond-find/free", $free);
+    }
+
+}
 
 1;
 
