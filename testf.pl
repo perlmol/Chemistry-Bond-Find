@@ -9,10 +9,15 @@ use blib;
 use Chemistry::Bond::Find;
 use Benchmark ':all';
 
+our $b;
+our $a;
+
 if ($a) {
     my $mol = Chemistry::Mol->read($ARGV[0] || "test1717.pdb");
     Chemistry::Bond::Find::find_bonds($mol, margin => $b || 1.5);
     printf "found %d bonds\n", scalar($mol->bonds);
+    print join(" ",map{s/a//g; $_} $_->atoms), "\n" for $mol->bonds;
+    #$mol->write("x.mol", format => "mdl");
     exit;
 }
 

@@ -5,6 +5,6 @@ WriteMakefile(
     'NAME'		=> 'Chemistry::Bond::Find',
     'VERSION_FROM'	=> 'Find.pm', # finds $VERSION
     'PREREQ_PM'		=> {
-        'Chemistry::Mol' => '0.10',
+        'Chemistry::Mol' => '0.22',
     },
 );

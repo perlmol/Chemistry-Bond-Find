@@ -1,4 +1,4 @@
-Chemistry/Bond/Find version 0.10
+Chemistry/Bond/Find version 0.20
 ================================
 
 Detects the bonds in a molecule from its 3D coordinates by using simple
@@ -7,9 +7,8 @@ have a bond order of 1.
 
 This module is part of the PerlMol project, L<http://www.perlmol.org/>.
 
-Changes since 0.05:
-    - Changed the recursive algorithm for a hash bucket algorithm, which
-      is 2-3 times faster for larger molecules.
+Changes since 0.10
+    - Added assign_orders
 
 INSTALLATION
 
