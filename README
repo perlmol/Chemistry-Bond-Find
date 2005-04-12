@@ -1,4 +1,4 @@
-Chemistry/Bond/Find version 0.21
+Chemistry/Bond/Find version 0.22
 ================================
 
 This module provides functions for detecting the bonds in a molecule from its
@@ -7,8 +7,9 @@ orders.
 
 This module is part of the PerlMol project, L<http://www.perlmol.org/>.
 
-Changes since 0.20
-        - New options for assign_bond_orders: scratch.
+Changes since 0.21
+    - Fixed bug in Baber algorithm for terminal methyls with no hydrogens.
+      Added a modification to improve results for conjugated systems.
 
 INSTALLATION
 
@@ -26,7 +27,7 @@ This module requires these other modules and libraries:
 
 COPYRIGHT AND LICENSE
 
-Copyright (C) 2004 Ivan Tubert <itub@cpan.org>
+Copyright (C) 2005 Ivan Tubert-Brohman <itub@cpan.org>
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. 

@@ -1,6 +1,6 @@
 package Chemistry::Bond::Find;
 
-$VERSION = '0.21';
+$VERSION = '0.22';
 our $DEBUG = 0;
 # $Id$
 
@@ -116,7 +116,7 @@ C<assign_bond_orders($mol, %opts)>.
 =item bond_class
 
 The class that will be used for creating the new bonds. The default is 
-L<Chemistry::Bond>.
+the bond class returned by C<< $mol->bond_class >>.
 
 =back
 
@@ -192,7 +192,7 @@ sub guess_margin {
 # brute-force N^2 algorithm
 sub find_bonds_n2_one_set {
     my ($mol, $atoms, $opts) = @_;
-    my $bond_class = $opts->{bond_class} || "Chemistry::Bond";
+    my $bond_class = $opts->{bond_class} || $mol->bond_class;
     for (my $i = 0; $i < @$atoms; ++$i) {
 	for (my $j = $i + 1; $j < @$atoms; ++$j) {
 	    my ($a1, $a2) = ($atoms->[$i], $atoms->[$j]);
@@ -206,7 +206,7 @@ sub find_bonds_n2_one_set {
 # brute force N*M algorithm for finding bonds between to sets of atoms
 sub find_bonds_n2_two_sets {
     my ($mol, $atoms1, $atoms2, $opts) = @_;
-    my $bond_class = $opts->{bond_class} || "Chemistry::Bond";
+    my $bond_class = $opts->{bond_class} || $mol->bond_class;
     for my $a1 (@$atoms1) {
 	for my $a2 (@$atoms2) {
 	    if (are_bonded($a1->symbol, $a2->symbol, scalar $a1->distance($a2), $opts)) {
@@ -214,54 +214,6 @@ sub find_bonds_n2_two_sets {
 	    }
 	}
     }
-}
-
-# The recursive algorithm used in version 0.05, here for historical purposes
-sub find_bonds_rec {
-    my ($mol, %opts) = @_;
-    %opts = (min_atoms => 20, tolerance => 1.1, %opts,
-        cutoffs => {});  # set defaults
-    my $margin = guess_margin($mol, \%opts);    
-    %opts = (margin => $margin, %opts);
-    _partition($mol, [$mol->atoms], 0, \%opts);
-}
-
-# partition space recursively, used by find_bonds_rec
-sub _partition {
-    my ($mol, $atoms, $dir, $opts) = @_;
-
-    #printf "_partition(%s, $dir)\n", scalar(@$atoms);
-
-    if (@$atoms < $opts->{min_atoms}) {
-        #print "BOTTOM!\n";
-        find_bonds_n2_one_set($mol, $atoms, $opts);
-        return;
-    }
-
-    my $min = ($atoms->[0]->coords->array)[$dir];
-    my $max = $min;
-    my $center;
-    for my $atom (@$atoms) {
-        my $coord = ($atom->coords->array)[$dir]; 
-        $center += $coord;
-        $min = $coord if $coord < $min;
-        $max = $coord if $coord > $min;
-    }
-    $center /= @$atoms;
-    #printf "center($dir)=%.2f; range=(%.2f, %.2f)\n", $center, $min, $max;
-
-    my @left = grep { ($_->coords->array)[$dir] < $center } @$atoms;
-    my @right = grep { ($_->coords->array)[$dir] >= $center } @$atoms;
-    _partition($mol, \@left, ($dir + 1) % 3, $opts);
-    _partition($mol, \@right, ($dir + 1) % 3, $opts);
-
-    # merge the interface between the two halves
-    my $margin = $opts->{margin};
-    my @left_margin = 
-        grep { ($_->coords->array)[$dir] > $center - $margin } @left;
-    my @right_margin = 
-        grep { ($_->coords->array)[$dir] < $center + $margin } @right;
-    find_bonds_n2_two_sets($mol, \@left_margin, \@right_margin, $opts);
 }
 
 
@@ -615,8 +567,9 @@ sub assign_initial_coordinations {
         $a_obs /= $n if $n;
 
         if ($n == 0) {
-            $max_conns  = 1;        # linear
-            $confidence = 10000;
+            # this condition is not described explicitly in the article
+            $max_conns  = 1;        # undefined
+            $confidence = 0;
             $n = 1;
         } elsif ($a_obs > 150) {
             $max_conns  = 2;        # linear
@@ -666,6 +619,10 @@ sub resolve_conflicts {
         my $n_bonds    = 0;
         $n_bonds += $_->order for $atom->bonds;
 
+        # this is a modification to avoid cummulative double bonds on 
+        # non linear carbon
+        my $n_multiple_bonds = grep { $_->order > 1 } $atom->bonds;
+
         if ($n_conns > $valence) {
             my $next_valence = next_valence($atom->symbol, $valence);
             if ($next_valence) {
@@ -677,7 +634,9 @@ sub resolve_conflicts {
                 warn "too many conns $n_conns to $atom with valence $valence\n";
                 next;
             }
-        } elsif ($n_bonds > $valence) {
+        } elsif ($n_bonds > $valence 
+            or $n_multiple_bonds > 1 and $max_conns > 2 and $atom->symbol eq 'C'
+        ) {
             my $next_valence = next_valence($atom->symbol, $valence);
             if ($next_valence) {
                 print "increasing valence of $atom to $next_valence\n" 
@@ -711,7 +670,9 @@ sub resolve_conflicts {
                 }
             }
 
-            if ($confidence > 95 or $min_conf < $confidence) {
+            #print "\t($confidence, $min_conf)\n" if ($atom->id eq 'a1');
+            if ($min_bond and ($confidence > 95 or $min_conf < $confidence)) {
+                #print "XXX: $atom\n";
                 my $new_order = $min_bond->order + 1;
                 $min_bond->order($new_order);
                 print "Increasing order of $min_bond to $new_order\n" if $DEBUG;
@@ -719,7 +680,7 @@ sub resolve_conflicts {
             } else {
                 $max_conns++;
                 $atom->attr("bond-find/max_conns", $max_conns);
-                print "Increasing coord. num. of $min_bond to $max_conns\n" 
+                print "Increasing coord. num. of $atom to $max_conns\n" 
                     if $DEBUG;
             }
             ++$changes, next;
@@ -745,7 +706,7 @@ sub next_valence {
 
 =head1 VERSION
 
-0.21
+0.22
 
 =head1 TO DO
 
@@ -763,15 +724,15 @@ L<http://www.perlmol.org/>.
 
 =head1 AUTHOR
 
-Ivan Tubert E<lt>itub@cpan.orgE<gt>
+Ivan Tubert-BrohmanE<lt>itub@cpan.orgE<gt>
 
 The new C<find_bonds> algorithm was loosely based on a suggestion by BrowserUK
 on perlmonks.org (L<http://perlmonks.org/index.pl?node_id=352838>).
 
 =head1 COPYRIGHT
 
-Copyright (c) 2004 Ivan Tubert. All rights reserved. This program is free
-software; you can redistribute it and/or modify it under the same terms as
+Copyright (c) 2005 Ivan Tubert-Brohman. All rights reserved. This program is
+free software; you can redistribute it and/or modify it under the same terms as
 Perl itself.
 
 =cut
