@@ -1,6 +1,6 @@
 package Chemistry::Bond::Find;
 
-$VERSION = '0.22';
+$VERSION = '0.23';
 our $DEBUG = 0;
 # $Id$
 
@@ -43,7 +43,7 @@ our %EXPORT_TAGS = (all => \@EXPORT_OK);
 
 # table taken from
 # http://environmentalchemistry.com/yogi/periodic/covalentradius.html
-my %Covalent_Radius = (
+our %Covalent_Radius = (
     Ag => 1.34, Al => 1.18, Ar => 0.98, As => 1.20, At => 1.45, Au => 1.34,
     B  => 0.82, Ba => 1.98, Be => 0.90, Bi => 1.46, Br => 1.14, C  => 0.77,
     Ca => 1.74, Cd => 1.48, Ce => 1.65, Cl => 0.99, Co => 1.16, Cr => 1.18,
@@ -61,7 +61,7 @@ my %Covalent_Radius = (
     Yb => 1.74, Zn => 1.25, Zr => 1.45,
 );
 
-my $Default_Radius = 1.5; # radius for unknown elements
+our $Default_Radius = 1.5; # radius for unknown elements
 
 # I considered inlining this function, but the performance gain was minimal
 # ( < 5 % ), so it's probably better to leave it here
@@ -481,7 +481,10 @@ sub assign_bond_orders_baber {
     assign_initial_coordinations($mol);
     my $tries = 0;
     while (resolve_conflicts($mol)) {
-        last if $tries++ > $max_tries;
+        if ($tries++ > $max_tries) {
+            print "too many tries\n" if $DEBUG;
+            last;
+        }
         print "try again\n" if $DEBUG;
     }
     $tries;
@@ -588,7 +591,7 @@ sub assign_initial_coordinations {
             $confidence = (115 - $a_obs) / 5.5;
         } elsif ($a_obs < 99) {
             $max_conns  = 6;        # octahedral
-            $confidence = (9 - $a_obs) / 9;
+            $confidence = (99 - $a_obs) / 9;
         } else {
             confess("impossible coordination angle $a_obs!");
         }
@@ -656,7 +659,7 @@ sub resolve_conflicts {
             my $new_order = $min_bond->order - 1;
             $min_bond->order($new_order);
             print "Decreasing order of $min_bond to $new_order\n" if $DEBUG;
-            $min_bond->attr('bond-find/confidence', $min_conf*1.2+rand());
+            #$min_bond->attr('bond-find/confidence', $min_conf*1.2+rand());
             ++$changes, next;
         } elsif ($n_bonds + $max_conns - $n_conns < $valence) {
             my ($min_conf, $min_bond);
@@ -676,7 +679,8 @@ sub resolve_conflicts {
                 my $new_order = $min_bond->order + 1;
                 $min_bond->order($new_order);
                 print "Increasing order of $min_bond to $new_order\n" if $DEBUG;
-                $min_bond->attr('bond-find/confidence', $min_conf*1.2+rand());
+                #$min_bond->attr('bond-find/confidence', $min_conf*1.2+rand());
+                #$atom->attr('bond-find/confidence', $confidence / 1.5);
             } else {
                 $max_conns++;
                 $atom->attr("bond-find/max_conns", $max_conns);
@@ -706,7 +710,7 @@ sub next_valence {
 
 =head1 VERSION
 
-0.22
+0.23
 
 =head1 TO DO
 

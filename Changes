@@ -1,5 +1,9 @@
 Revision history for Perl extension Chemistry::Bond::Find
 
+0.23
+        - Turned the variables with the covalent radii into globals in case
+          someone really needs them (per Perl's no-shotgun policy).
+
 0.22  Apr 12 2005
         - Fixed bug in Baber algorithm for terminal methyls with no hydrogens.
           Added a modification to improve results for conjugated systems.
