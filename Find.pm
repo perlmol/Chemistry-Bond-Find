@@ -350,6 +350,16 @@ sub wants_more_bonds {
     $ret;
 }
 
+sub valid_bonds {
+    my ($atom) = @_;
+    my $valence = $atom->valence;
+    #$n_bonds += $_->order for $atom->bonds;
+
+    my $ret = ($valence <= ($MIN_VALENCES{$atom->symbol} || 1));
+    print "    $atom wants more bonds? '$ret'\n" if $DEBUG;
+    $ret;
+}
+
 # the heart of the algorithm; increase a bond order, and then do the same
 # recursively for the neighbors. If everybody's not happy at the end, 
 # backtrack and try another bond. Note that this search does not cover the
@@ -735,7 +745,7 @@ on perlmonks.org (L<http://perlmonks.org/index.pl?node_id=352838>).
 
 =head1 COPYRIGHT
 
-Copyright (c) 2005 Ivan Tubert-Brohman. All rights reserved. This program is
+Copyright (c) 2009 Ivan Tubert-Brohman. All rights reserved. This program is
 free software; you can redistribute it and/or modify it under the same terms as
 Perl itself.
 

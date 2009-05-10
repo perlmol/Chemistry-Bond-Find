@@ -1,8 +1,9 @@
 Revision history for Perl extension Chemistry::Bond::Find
 
-0.23
+0.23  May 10 2009
         - Turned the variables with the covalent radii into globals in case
           someone really needs them (per Perl's no-shotgun policy).
+        - Added an undocumented 'valid_bonds' method (Liliana Felix Avila).
 
 0.22  Apr 12 2005
         - Fixed bug in Baber algorithm for terminal methyls with no hydrogens.
